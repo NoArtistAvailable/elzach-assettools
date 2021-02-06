@@ -1,0 +1,24 @@
+{
+  "name": "com.elzach.assettools",
+  "displayName": "elZach Assettools",
+  "author": {
+    "name": "elZach",
+    "email": "dont@message.me",
+    "url": ""
+  },
+  "version": "0.0.1",
+  "unity": "2020.1",
+  "unityRelease": "0a10",
+  "description": "Package which contains tools to process assetdata.",
+  "keywords": [
+    "Assets"
+  ],
+  "category": "Common",
+  "dependencies": {
+	"com.elzach.extensions": "0.0.5",
+	"com.unity.formats.fbx" : "4.0.0-pre.1"
+  },
+  "relatedPackages": {
+  
+  }
+}
