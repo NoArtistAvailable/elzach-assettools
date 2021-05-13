@@ -13,12 +13,46 @@ namespace elZach.AssetConversion
 {
     public class AnimationConversionWindow : EditorWindow
     {
+        public struct AnimationImportSettings
+        {
+            public bool isLooping,
+                bakeRotation,
+                bakeY,
+                bakeXZ;
+
+            public bool affectIsLooping,
+                affectBakeRotation,
+                affectBakeY,
+                affectBakeXZ;
+
+            public void DrawSettings()
+            {
+                EditorGUILayout.BeginVertical();
+                DrawOption(nameof(isLooping), ref affectIsLooping, ref isLooping);
+                DrawOption(nameof(bakeRotation), ref affectBakeRotation, ref bakeRotation);
+                DrawOption(nameof(bakeY), ref affectBakeY, ref bakeY);
+                DrawOption(nameof(bakeXZ), ref affectBakeXZ, ref bakeXZ);
+                EditorGUILayout.EndVertical();
+            }
+
+            void DrawOption(string name, ref bool affect, ref bool value)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(10);
+                affect = EditorGUILayout.Toggle(affect, GUILayout.Width(22));
+                EditorGUI.BeginDisabledGroup(!affect);
+                value = EditorGUILayout.Toggle(name, value);
+                EditorGUI.EndDisabledGroup();
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+
         [MenuItem("Window/Asset Conversion Tools/Animation Conversion")]
         static void Init()
         {
             AnimationConversionWindow window = (AnimationConversionWindow)EditorWindow.GetWindow(typeof(AnimationConversionWindow));
             window.titleContent = new GUIContent("Animation Conversion");
-            window.minSize = new Vector2(250, 200);
+            window.minSize = new Vector2(250, 380);
             window.Show();
         }
 
@@ -26,6 +60,7 @@ namespace elZach.AssetConversion
         string _prefix;
         bool _forceLooping;
         GameObject _meshObject;
+        static AnimationImportSettings importSettings = new AnimationImportSettings();
 
         static bool alwaysFalse = false;
 
@@ -41,9 +76,9 @@ namespace elZach.AssetConversion
             EditorGUILayout.LabelField("Path:", GUILayout.Width(40));
             _path = EditorGUILayout.TextField(_path);
             EditorGUILayout.EndHorizontal();
-            _meshObject = (GameObject) EditorGUILayout.ObjectField("FBX",_meshObject, typeof(GameObject),false);
+            _meshObject = (GameObject)EditorGUILayout.ObjectField("FBX", _meshObject, typeof(GameObject), false);
             _prefix = EditorGUILayout.TextField("Prefix:", _prefix);
-            _forceLooping = EditorGUILayout.Toggle("Force Looping:",_forceLooping);
+            _forceLooping = EditorGUILayout.Toggle("Force Looping:", _forceLooping);
 
             EditorGUILayout.HelpBox("Animation and Rig need to be set to generic for packing process.", MessageType.Info);
             EditorGUILayout.HelpBox("Recommended to check FBX export configuration for binary instead of ASCII.", MessageType.Info);
@@ -59,6 +94,25 @@ namespace elZach.AssetConversion
                 AddPrefix(_meshObject, _prefix);
             if (GUILayout.Button("Make Clips in FBX loop"))
                 MakeClipsLoopable(_meshObject);
+
+            EditorGUILayout.Separator();
+            EditorGUILayout.LabelField("Apply Settings");
+
+            EditorGUILayout.BeginHorizontal();
+            importSettings.DrawSettings();
+
+            EditorGUILayout.BeginVertical();
+            if (GUILayout.Button("Get Info From FBX"))
+                CheckAnimationInfo(_meshObject);
+            if (GUILayout.Button("Apply To FBX"))
+                ApplySettingsToClip(_meshObject);
+            if (GUILayout.Button("Apply To Folder"))
+            {
+                DoForAllAtPath(_path, ApplySettingsToClip);
+            }
+            EditorGUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
         }
 
         class Container
@@ -207,6 +261,22 @@ namespace elZach.AssetConversion
             //AssetDatabase.CreateAsset(clips, path + "/testasset.fbx");
         }
 
+        public static void DoForAllAtPath(string path, Action<GameObject> action)
+        {
+            var info = new DirectoryInfo(path);
+            var fileInfo = info.GetFiles();
+            foreach (var file in fileInfo)
+            {
+                if (file.Extension == ".fbx")
+                {
+                    string relativePath = path + "/" + file.Name;
+                    Debug.Log(relativePath);
+                    GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(relativePath);
+                    action.Invoke(go);
+                }
+            }
+        }
+
         public static void RenameAllAtPath(string path, string prefix, bool forceLooping = false)
         {
             var info = new DirectoryInfo(path);
@@ -286,6 +356,55 @@ namespace elZach.AssetConversion
                 animationClips[i] = importer.clipAnimations[i];
                 if (animationClips[i].name.Length < prefix.Length || animationClips[i].name.Substring(0, prefix.Length).ToUpper() != prefix.ToUpper())
                     animationClips[i].name = prefix + animationClips[i].name;
+            }
+            importer.clipAnimations = animationClips;
+            importer.SaveAndReimport();
+        }
+
+        public static bool CheckAnimationInfo(GameObject asset)
+        {
+            var path = AssetDatabase.GetAssetPath(asset);
+            Debug.Log("Path: " + path);
+            ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            Debug.Log("Clipcount: " + importer.clipAnimations.Length);
+            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.clipAnimations.Length];
+
+            //string relativePath = path + "/" + file.Name;
+            AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+            Debug.Log(clip.name);
+
+            Debug.Log(
+                nameof(clip.apparentSpeed) + " : " + clip.apparentSpeed + "\n "
+                + nameof(clip.averageSpeed) + " : " + clip.averageSpeed + "\n "
+                + nameof(clip.hasGenericRootTransform) + " : " + clip.hasGenericRootTransform + "\n "
+                + nameof(clip.hasMotionCurves) + " : " + clip.hasMotionCurves + "\n "
+                + nameof(clip.hasRootCurves) + " : " + clip.hasRootCurves + "\n "
+                + nameof(clip.isHumanMotion) + " : " + clip.isHumanMotion + "\n "
+                + nameof(clip.isLooping) + " : " + clip.isLooping);
+            //for (int i = 0; i < importer.clipAnimations.Length; i++)
+            //{
+            //    //mporter.
+            //    animationClips[i] = importer.clipAnimations[i];
+            //    if (animationClips[i].firstFrame
+            //}
+            return false;
+        }
+
+        public static void ApplySettingsToClip(GameObject asset)
+        {
+            var path = AssetDatabase.GetAssetPath(asset);
+            Debug.Log("Path: " + path);
+            ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            Debug.Log("Clipcount: " + importer.clipAnimations.Length);
+            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.clipAnimations.Length];
+
+            for (int i = 0; i < importer.clipAnimations.Length; i++)
+            {
+                animationClips[i] = importer.clipAnimations[i];
+                if (importSettings.affectIsLooping) animationClips[i].loop = importSettings.isLooping;
+                if (importSettings.affectBakeRotation) animationClips[i].lockRootRotation = importSettings.bakeRotation;
+                if (importSettings.affectBakeY) animationClips[i].lockRootHeightY = importSettings.bakeY;
+                if (importSettings.affectBakeXZ) animationClips[i].lockRootPositionXZ = importSettings.bakeXZ;
             }
             importer.clipAnimations = animationClips;
             importer.SaveAndReimport();
