@@ -107,9 +107,9 @@ namespace elZach.AssetConversion
             if (GUILayout.Button("Apply To FBX"))
                 ApplySettingsToClip(_meshObject);
             if (GUILayout.Button("Apply To Folder"))
-            {
                 DoForAllAtPath(_path, ApplySettingsToClip);
-            }
+            if (GUILayout.Button("Apply To Folder & Subfolders"))
+                DoForAllAssetsInSubfolders(_path, ApplySettingsToClip);
             EditorGUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
@@ -267,11 +267,45 @@ namespace elZach.AssetConversion
             var fileInfo = info.GetFiles();
             foreach (var file in fileInfo)
             {
-                if (file.Extension == ".fbx")
+                if (file.Extension.ToUpper() == ".FBX")
                 {
                     string relativePath = path + "/" + file.Name;
                     Debug.Log(relativePath);
                     GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(relativePath);
+                    action.Invoke(go);
+                }
+            }
+        }
+
+        public static List<FileInfo> GetAllFileInfosFromSubFolders(string path)
+        {
+            List<FileInfo> files = new List<FileInfo>();
+            var info = new DirectoryInfo(path);
+            var fileInfo = info.GetFiles();
+            files.AddRange(fileInfo);
+            var directoryInfo = info.GetDirectories();
+            foreach (var subFolder in directoryInfo)
+            {
+                files.AddRange(GetAllFileInfosFromSubFolders(path + "/" + subFolder.Name));
+            }
+            return files;
+        }
+
+        public static void DoForAllAssetsInSubfolders(string path, Action<GameObject> action)
+        {
+            var files = GetAllFileInfosFromSubFolders(path);
+            //Debug.Log(files.Count);
+            foreach (var file in files)
+            {
+                if (file.Extension.ToUpper() == ".FBX")
+                {
+                    string absolutePath = file.FullName.ToString();
+                    //Debug.Log(Application.dataPath);
+                    string relativePath = EditorHelper.Datahandling.EnsureAssetDataPath(absolutePath);
+                    Debug.Log(relativePath);
+                    //continue;
+                    GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(relativePath);
+                    //Debug.Log("name:" + go.name);
                     action.Invoke(go);
                 }
             }
@@ -283,7 +317,7 @@ namespace elZach.AssetConversion
             var fileInfo = info.GetFiles();
             foreach (var file in fileInfo)
             {
-                if (file.Extension == ".fbx")
+                if (file.Extension.ToUpper() == ".FBX")
                 {
                     string relativePath = path + "/" + file.Name;
                     Debug.Log(relativePath);
