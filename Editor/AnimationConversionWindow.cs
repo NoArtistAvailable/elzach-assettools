@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using System;
 using System.IO;
+using System.Linq;
 using Autodesk.Fbx;
 using UnityEditor.Formats.Fbx.Exporter;
 using UnityEditor.Animations;
@@ -85,13 +86,27 @@ namespace elZach.AssetConversion
 
             if (GUILayout.Button("Pack Animations of path into combined fbx"))
                 PackAnimations(_path, _meshObject);
+            // if (GUILayout.Button("Mirror Settings From Folder to fbx"))
+            //     MirrorAnimationSettingsFromPathToFBX(_path, _meshObject); // doesnt work
 
-            if (GUILayout.Button("Rename Clips in Path like Filenames"))
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Rename Clips in Path like Filenames",GUILayout.Width(position.width/2f-4)))
                 RenameAllAtPath(_path, _prefix, _forceLooping);
-            if (GUILayout.Button("Rename Clips in FBX like Filename"))
+            if (GUILayout.Button("Rename Clips in FBX like Filename",GUILayout.Width(position.width/2f-4)))
                 RenameClips(_meshObject, _prefix, _forceLooping);
-            if (GUILayout.Button("Add Prefix To Clipnames in FBX"))
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Add Prefix To Clipnames in FBX",GUILayout.Width(position.width/2f-4)))
                 AddPrefix(_meshObject, _prefix);
+            if (GUILayout.Button("Remove Prefix From Clipnames in FBX",GUILayout.Width(position.width/2f-4)))
+                RemovePrefix(_meshObject, _prefix);
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Add Prefix To Clipnames in Folder",GUILayout.Width(position.width/2f-4)))
+                AddPrefixFolder(_path, _prefix);
+            if (GUILayout.Button("Remove Prefix From Clipnames in Folder",GUILayout.Width(position.width/2f-4)))
+                RemovePrefixFolder(_path, _prefix);
+            EditorGUILayout.EndHorizontal();
             if (GUILayout.Button("Make Clips in FBX loop"))
                 MakeClipsLoopable(_meshObject);
 
@@ -112,6 +127,14 @@ namespace elZach.AssetConversion
                 DoForAllAssetsInSubfolders(_path, ApplySettingsToClip);
             EditorGUILayout.EndVertical();
             GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.Separator();
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Create Animator From Folder",GUILayout.Width(position.width/2f-4)))
+                CreateFromClips(GetAllClipsFromFolder(_path));
+            if (GUILayout.Button("Create Animator From FBX", GUILayout.Width(position.width / 2f - 4)))
+                CreateFromClips(GetAllClipsFromFBX(_meshObject), _meshObject.name + "Animator");
             EditorGUILayout.EndHorizontal();
         }
 
@@ -261,6 +284,67 @@ namespace elZach.AssetConversion
             //AssetDatabase.CreateAsset(clips, path + "/testasset.fbx");
         }
 
+        public static void MirrorAnimationSettingsFromPathToFBX(string path, GameObject targetFbx)
+        {
+            // for whatever reason this doesn't seem to work at all
+            if (alwaysFalse)
+            {
+                //List<AnimationClip> clips = new List<AnimationClip>();
+                List<ModelImporterClipAnimation> clipDatas = new List<ModelImporterClipAnimation>();
+
+                var info = new DirectoryInfo(path);
+                var fileInfo = info.GetFiles();
+                foreach (var file in fileInfo)
+                {
+                    if (file.Extension == ".fbx" || file.Extension == ".FBX")
+                    {
+                        string relativePath = path + "/" + file.Name;
+                        ModelImporter importer = AssetImporter.GetAtPath(relativePath) as ModelImporter;
+                        if (importer != null)
+                        {
+                            clipDatas.AddRange(importer.defaultClipAnimations);
+                        }
+                    }
+                }
+
+                if (clipDatas.Count == 0)
+                {
+                    Debug.Log("No ClipDatas in Folder");
+                    return;
+                }
+
+                var fbxPath = AssetDatabase.GetAssetPath(targetFbx);
+                ModelImporter fbxImporter = AssetImporter.GetAtPath(fbxPath) as ModelImporter;
+                ModelImporterClipAnimation[] clipsFbx =
+                    new ModelImporterClipAnimation[fbxImporter.defaultClipAnimations.Length];
+                int matches = 0;
+                for (int i = 0; i < fbxImporter.defaultClipAnimations.Length; i++)
+                {
+                    clipsFbx[i] = fbxImporter.defaultClipAnimations[i];
+                    if (clipDatas.Any(x => x.name == clipsFbx[i].name))
+                    {
+                        var match = clipDatas.FirstOrDefault(x => x.name == fbxImporter.defaultClipAnimations[i].name);
+                        fbxImporter.defaultClipAnimations[i].lockRootRotation = match.lockRootRotation;
+                        fbxImporter.defaultClipAnimations[i].lockRootHeightY = match.lockRootHeightY;
+                        fbxImporter.defaultClipAnimations[i].lockRootPositionXZ = match.lockRootPositionXZ;
+                        fbxImporter.defaultClipAnimations[i].rotationOffset = match.rotationOffset;
+                        fbxImporter.defaultClipAnimations[i].heightOffset = match.heightOffset;
+                        fbxImporter.defaultClipAnimations[i].keepOriginalPositionY = match.keepOriginalPositionY;
+                        fbxImporter.defaultClipAnimations[i].keepOriginalOrientation = match.keepOriginalOrientation;
+                        fbxImporter.defaultClipAnimations[i].keepOriginalPositionXZ = match.keepOriginalPositionXZ;
+                        fbxImporter.defaultClipAnimations[i].loop = match.loop;
+                        fbxImporter.defaultClipAnimations[i].mirror = match.mirror;
+                        fbxImporter.defaultClipAnimations[i].heightFromFeet = match.heightFromFeet;
+
+                        matches++;
+                    }
+                }
+
+                Debug.Log($"Clips in Folder: {clipDatas.Count} | in FBX: {clipsFbx.Length} -> Matches: {matches}");
+                fbxImporter.SaveAndReimport();
+            }
+        }
+
         public static void DoForAllAtPath(string path, Action<GameObject> action)
         {
             var info = new DirectoryInfo(path);
@@ -341,7 +425,6 @@ namespace elZach.AssetConversion
             //}
             for (int i = 0; i < importer.defaultClipAnimations.Length; i++)
             {
-
                 animationClips[i] = importer.defaultClipAnimations[i];
                 Debug.Log(animationClips[i].takeName);
                 if (forceLooping)
@@ -378,18 +461,39 @@ namespace elZach.AssetConversion
             importer.SaveAndReimport();
         }
 
+        public static void AddPrefixFolder(string path, string prefix) =>
+            DoForAllAtPath(path, (target) => AddPrefix(target, prefix));
         public static void AddPrefix(GameObject asset, string prefix)
         {
             var path = AssetDatabase.GetAssetPath(asset);
             Debug.Log("Path: " + path);
             ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
-            Debug.Log("Clipcount: " + importer.clipAnimations.Length);
-            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.clipAnimations.Length];
-            for (int i = 0; i < importer.clipAnimations.Length; i++)
+            Debug.Log("Clipcount: " + importer.defaultClipAnimations.Length);
+            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.defaultClipAnimations.Length];
+            for (int i = 0; i < importer.defaultClipAnimations.Length; i++)
             {
-                animationClips[i] = importer.clipAnimations[i];
+                animationClips[i] = importer.defaultClipAnimations[i];
                 if (animationClips[i].name.Length < prefix.Length || animationClips[i].name.Substring(0, prefix.Length).ToUpper() != prefix.ToUpper())
                     animationClips[i].name = prefix + animationClips[i].name;
+            }
+            importer.clipAnimations = animationClips;
+            importer.SaveAndReimport();
+        }
+
+        public static void RemovePrefixFolder(string path, string prefix) =>
+            DoForAllAtPath(path, (target) => RemovePrefix(target, prefix));
+        public static void RemovePrefix(GameObject asset, string prefix)
+        {
+            var path = AssetDatabase.GetAssetPath(asset);
+            Debug.Log("Path: " + path);
+            ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            Debug.Log("Clipcount: " + importer.defaultClipAnimations.Length);
+            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.defaultClipAnimations.Length];
+            for (int i = 0; i < importer.defaultClipAnimations.Length; i++)
+            {
+                animationClips[i] = importer.defaultClipAnimations[i];
+                if (animationClips[i].name.StartsWith(prefix))
+                    animationClips[i].name = animationClips[i].name.Substring(prefix.Length);
             }
             importer.clipAnimations = animationClips;
             importer.SaveAndReimport();
@@ -442,6 +546,60 @@ namespace elZach.AssetConversion
             }
             importer.clipAnimations = animationClips;
             importer.SaveAndReimport();
+        }
+
+        public static List<AnimationClip> GetAllClipsFromFolder(string path)
+        {
+            List<AnimationClip> clips = new List<AnimationClip>();
+            var info = new DirectoryInfo(path);
+            var fileInfo = info.GetFiles();
+            foreach (var file in fileInfo)
+            {
+                if (file.Extension == ".fbx" || file.Extension == ".FBX")
+                {
+                    string relativePath = path + "/" + file.Name;
+                    AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(relativePath);
+                    if (clip != null)
+                    {
+                        clips.Add(clip);
+                    }
+                }
+            }
+            return clips;
+        }
+
+        public static List<AnimationClip> GetAllClipsFromFBX(GameObject meshObject)
+        {
+            List<AnimationClip> clips = new List<AnimationClip>();
+            foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GetAssetPath(meshObject)))
+            {
+                var clip = obj as AnimationClip;
+                if(clip) clips.Add(clip);
+            }
+            return clips;
+        }
+
+        public static AnimatorController CreateFromClips(IEnumerable<AnimationClip> clips, string name = "clips")
+        {
+            var controller = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath($"Assets/{name}.controller");
+            var rootStateMachine = controller.layers[0].stateMachine;
+            AnimatorState previousState = null;
+            foreach (var clip in clips)
+            {
+                var clipState = rootStateMachine.AddState(clip.name);
+                clipState.motion = clip;
+                if (previousState)
+                {
+                    var transition = previousState.AddTransition(clipState);
+                    transition.hasExitTime = true;
+                    transition.duration = 0.1f;
+                    transition.exitTime = 0.99f;
+                }
+
+                previousState = clipState;
+            }
+
+            return controller;
         }
     }
 }

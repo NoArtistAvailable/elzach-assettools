@@ -8,14 +8,13 @@ using Debug = UnityEngine.Debug;
 
 namespace elZach.AssetConversion
 {
-
     public class GUIDOperationsWindow : EditorWindow
     {
         [MenuItem("Window/Asset Conversion Tools/GUID Operations")]
         static void Init()
         {
             GUIDOperationsWindow window = (GUIDOperationsWindow) EditorWindow.GetWindow(typeof(GUIDOperationsWindow));
-            window.titleContent = new GUIContent("Animation Conversion");
+            window.titleContent = new GUIContent("GUID Replacement");
             window.minSize = new Vector2(550, 380);
             window.Show();
         }
@@ -45,8 +44,8 @@ namespace elZach.AssetConversion
 
             if (GUILayout.Button("Get Assets"))
             {
-                guidReferences.Add(AssetDatabase.AssetPathToGUID(_path), (_path, null));
                 guidReferences = new Dictionary<string, (string, List<string>)>();
+                guidReferences.Add(AssetDatabase.AssetPathToGUID(_path), (_path, null));
                 var guids = AssetDatabase.FindAssets("", new string[] {_path});
                 foreach (var guid in guids)
                 {
@@ -93,7 +92,7 @@ namespace elZach.AssetConversion
 
             EditorGUILayout.BeginHorizontal();
             limitReferenceSearch = EditorGUILayout.Toggle(limitReferenceSearch, GUILayout.Width(25));
-            EditorGUILayout.LabelField("Limit Reference Search To Selected Folder");
+            EditorGUILayout.LabelField("Limit Reference Search To Selected Folder",GUILayout.Width(400));
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
 
