@@ -95,6 +95,10 @@ namespace elZach.AssetConversion
             if (GUILayout.Button("Rename Clips in FBX like Filename",GUILayout.Width(position.width/2f-4)))
                 RenameClips(_meshObject, _prefix, _forceLooping);
             EditorGUILayout.EndHorizontal();
+            if (GUILayout.Button("Rename Filenames to Clip names"))
+            {
+                RenameAllFilesAtPath(_path);
+            }
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Add Prefix To Clipnames in FBX",GUILayout.Width(position.width/2f-4)))
                 AddPrefix(_meshObject, _prefix);
@@ -442,6 +446,35 @@ namespace elZach.AssetConversion
             }
         }
 
+        public static void RenameAllFilesAtPath(string path)
+        {
+            var info = new DirectoryInfo(path);
+            var fileInfo = info.GetFiles();
+            foreach (var file in fileInfo)
+            {
+                if (file.Extension.ToUpper() == ".FBX")
+                {
+                    string relativePath = path + "/" + file.Name;
+                    Debug.Log(relativePath);
+                    RenameFileToClipName(relativePath);
+                }
+            }
+        }
+        public static void RenameFileToClipName(GameObject asset)
+        {
+            var path = AssetDatabase.GetAssetPath(asset);
+            Debug.Log("Path: " + path);
+            RenameFileToClipName(path);
+        }
+
+        public static void RenameFileToClipName(string path)
+        {
+            ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            if (!importer || importer.clipAnimations.Length == 0) return;
+            var firstClip = importer.clipAnimations[0];
+            AssetDatabase.RenameAsset(path, firstClip.name);
+        }
+
         public static void MakeClipsLoopable(GameObject asset)
         {
             var path = AssetDatabase.GetAssetPath(asset);
@@ -468,11 +501,11 @@ namespace elZach.AssetConversion
             var path = AssetDatabase.GetAssetPath(asset);
             Debug.Log("Path: " + path);
             ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
-            Debug.Log("Clipcount: " + importer.defaultClipAnimations.Length);
-            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.defaultClipAnimations.Length];
-            for (int i = 0; i < importer.defaultClipAnimations.Length; i++)
+            Debug.Log("Clipcount: " + importer.clipAnimations.Length);
+            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.clipAnimations.Length];
+            for (int i = 0; i < importer.clipAnimations.Length; i++)
             {
-                animationClips[i] = importer.defaultClipAnimations[i];
+                animationClips[i] = importer.clipAnimations[i];
                 if (animationClips[i].name.Length < prefix.Length || animationClips[i].name.Substring(0, prefix.Length).ToUpper() != prefix.ToUpper())
                     animationClips[i].name = prefix + animationClips[i].name;
             }
@@ -487,11 +520,11 @@ namespace elZach.AssetConversion
             var path = AssetDatabase.GetAssetPath(asset);
             Debug.Log("Path: " + path);
             ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
-            Debug.Log("Clipcount: " + importer.defaultClipAnimations.Length);
-            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.defaultClipAnimations.Length];
-            for (int i = 0; i < importer.defaultClipAnimations.Length; i++)
+            Debug.Log("Clipcount: " + importer.clipAnimations.Length);
+            ModelImporterClipAnimation[] animationClips = new ModelImporterClipAnimation[importer.clipAnimations.Length];
+            for (int i = 0; i < importer.clipAnimations.Length; i++)
             {
-                animationClips[i] = importer.defaultClipAnimations[i];
+                animationClips[i] = importer.clipAnimations[i];
                 if (animationClips[i].name.StartsWith(prefix))
                     animationClips[i].name = animationClips[i].name.Substring(prefix.Length);
             }
